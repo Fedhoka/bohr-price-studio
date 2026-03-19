@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BOHR · Price Studio</title>
+    <link rel="stylesheet" href="css/style.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="js/icons.js"></script>
+</head>
+<body>
+
+<div class="app-shell">
+
+    <!-- ── SIDEBAR ── -->
+    <aside class="sidebar">
+        <div class="sidebar-logo">
+            <img src="assets/bohr-logo.png" class="sidebar-logo-img" alt="BOHR">
+            <div class="logo-sub">Price Studio</div>
+        </div>
+
+        <nav class="sidebar-nav">
+            <div class="nav-section-label">Línea</div>
+            <button class="nav-item active" data-view="barriles">
+                <i class="fas fa-beer"></i> Barriles
+            </button>
+            <button class="nav-item" data-view="latas">
+                <i class="fas fa-box"></i> Latas
+            </button>
+
+            <div class="nav-section-label">
+                Tipos de Lista
+                <button class="add-btn-xs" id="btnAddListType" title="Nueva lista">+</button>
+            </div>
+            <div id="listTypesNav"></div>
+        </nav>
+
+        <div class="sidebar-footer">
+            <button class="nav-item" id="btnSettings" style="width:100%;">
+                <i class="fas fa-gear"></i> Configuración
+            </button>
+        </div>
+    </aside>
+
+    <!-- ── MAIN PANEL ── -->
+    <main class="main-panel">
+        <header class="topbar">
+            <div class="topbar-left">
+                <div class="page-title">Lista: <span id="titleLine">Barriles</span> · <span id="titleList" style="color:var(--text-2); font-weight:400;">Mayorista</span></div>
+                <div class="page-sub" id="pageSubCount">0 productos</div>
+            </div>
+            <div class="topbar-actions">
+                <button class="btn btn-secondary" id="btnHistory">
+                    <i class="fas fa-clock-rotate-left"></i> Historial
+                </button>
+                <button class="btn btn-secondary" id="btnSaveSnapshot">
+                    <i class="fas fa-floppy-disk"></i> Guardar versión
+                </button>
+                <button class="btn btn-primary" id="btnGenerate">
+                    <i class="fas fa-download"></i> Descargar JPG
+                </button>
+            </div>
+        </header>
+
+        <div class="content-area">
+            <div class="section-header">
+                <div class="section-title-text">Productos</div>
+                <button class="btn btn-secondary" id="btnAddProduct">
+                    <i class="fas fa-plus"></i> Nuevo producto
+                </button>
+            </div>
+
+            <div class="table-card">
+                <table id="productsTable">
+                    <thead>
+                        <tr>
+                            <th>Estilo / Nombre</th>
+                            <th>Formato</th>
+                            <th>ABV</th>
+                            <th>IBU</th>
+                            <th>Precio</th>
+                            <th style="text-align:right;">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody id="productsTbody"></tbody>
+                </table>
+                <div id="emptyState" class="empty-state hidden">
+                    <i class="fas fa-beer"></i>
+                    <p>Sin productos. Añadí el primero.</p>
+                </div>
+            </div>
+
+            <div class="history-section">
+                <div class="section-header" style="margin-top:32px;">
+                    <div class="section-title-text">Versiones guardadas</div>
+                </div>
+                <div class="history-list" id="historyList">
+                    <div style="font-size:0.8rem; color:var(--text-3); padding:10px 0;">Sin versiones aún. Guardá una versión para trackear cambios de precio.</div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- ── PREVIEW PANEL ── -->
+    <aside class="preview-panel">
+        <div class="preview-header">
+            <div class="preview-title">Vista Previa</div>
+            <div class="preview-live-dot"><div class="live-dot"></div> En vivo</div>
+        </div>
+        <div class="preview-scroll">
+
+            <div id="uploadZone" class="preview-upload-area" onclick="document.getElementById('previewImageInput').click()">
+                <input type="file" accept="image/*" id="previewImageInput">
+                <label class="preview-upload-label">
+                    <i class="fas fa-image"></i>
+                    <strong>Subir imagen de fondo</strong>
+                    <span>Para esta línea y lista</span>
+                </label>
+            </div>
+            <div id="imageStatus" class="preview-img-status hidden">
+                <span><i class="fas fa-check-circle"></i> Imagen cargada</span>
+                <button class="btn btn-ghost" style="padding:4px 8px; font-size:0.75rem;" onclick="clearCurrentImage()">Quitar</button>
+            </div>
+
+            <div class="preview-card">
+                <div class="preview-card-inner" id="previewInner">
+                    <img id="previewBgImg" class="preview-bg-img" src="" style="display:none;" alt="">
+                    <div class="preview-overlay" id="previewOverlay" style="display:none;"></div>
+
+                    <div class="preview-logo-area">
+                        <img src="assets/bohr-logo.png" class="preview-logo-img" id="pvLogoImg" alt="BOHR">
+                        <div class="preview-list-badge" id="pvBadge">MAYORISTA</div>
+                    </div>
+
+                    <div style="flex:1;"></div>
+
+                    <div class="preview-prices-box" id="pvPricesBox">
+                        <div class="preview-empty-msg">Sin productos aún</div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </aside>
+</div>
+
+<!-- ── EXPORT CANVAS ── -->
+<div class="export-wrap" id="exportWrap">
+    <div id="exportCanvas" class="export-canvas">
+        <img id="ecBgImg" class="ec-bg-img" src="" alt="">
+        <div class="ec-overlay"></div>
+
+        <div class="ec-logo-area">
+            <img src="assets/bohr-logo.png" class="ec-logo-img" alt="BOHR" id="ecLogoImg">
+            <div class="ec-list-badge" id="ecListBadge">MAYORISTA</div>
+            <div class="ec-line-label" id="ecLineLabel">BARRIL</div>
+        </div>
+
+        <div class="ec-spacer"></div>
+        <div class="ec-prices" id="ecPrices"></div>
+        <div class="ec-spacer"></div>
+
+        <div class="ec-footer" id="ecFooter">CONTACTO / REDES SOCIALES</div>
+    </div>
+</div>
+
+<!-- ── MODAL: Producto ── -->
+<div class="modal-overlay hidden" id="modalProduct">
+    <div class="modal-box">
+        <div class="modal-head">
+            <h3 id="modalProductTitle">Nuevo Producto</h3>
+            <button class="modal-close" onclick="closeAllModals()">&times;</button>
+        </div>
+        <div class="field">
+            <label>Nombre del Estilo</label>
+            <input type="text" id="fName" placeholder="Ej: IPA, Stout, Pale Ale...">
+        </div>
+        <div class="field-row">
+            <div class="field">
+                <label>Formato</label>
+                <input type="text" id="fFormat" placeholder="Ej: Barril 50L">
+            </div>
+            <div class="field">
+                <label>Precio ($)</label>
+                <input type="number" id="fPrice" min="0" placeholder="0">
+            </div>
+        </div>
+        <div class="field-row">
+            <div class="field">
+                <label>ABV % <span style="color:var(--text-3); font-weight:400;">(opcional)</span></label>
+                <input type="text" id="fAbv" placeholder="Ej: 6.5%">
+            </div>
+            <div class="field">
+                <label>IBU <span style="color:var(--text-3); font-weight:400;">(opcional)</span></label>
+                <input type="text" id="fIbu" placeholder="Ej: 45">
+            </div>
+        </div>
+        <div class="field">
+            <label>Descripción <span style="color:var(--text-3); font-weight:400;">(opcional)</span></label>
+            <input type="text" id="fDesc" placeholder="Notas aromáticas, maridaje, etc.">
+        </div>
+        <input type="hidden" id="fId">
+        <div class="modal-actions">
+            <button class="btn btn-ghost" onclick="closeAllModals()">Cancelar</button>
+            <button class="btn btn-primary" onclick="submitProduct()">Guardar</button>
+        </div>
+    </div>
+</div>
+
+<!-- ── MODAL: Nueva lista ── -->
+<div class="modal-overlay hidden" id="modalListType">
+    <div class="modal-box">
+        <div class="modal-head">
+            <h3>Nueva Lista</h3>
+            <button class="modal-close" onclick="closeAllModals()">&times;</button>
+        </div>
+        <div class="field">
+            <label>Nombre</label>
+            <input type="text" id="fListName" placeholder="Ej: Revendedores, VIP...">
+        </div>
+        <div class="modal-actions">
+            <button class="btn btn-ghost" onclick="closeAllModals()">Cancelar</button>
+            <button class="btn btn-primary" onclick="submitListType()">Crear</button>
+        </div>
+    </div>
+</div>
+
+<!-- ── MODAL: Configuración ── -->
+<div class="modal-overlay hidden" id="modalSettings">
+    <div class="modal-box wide">
+        <div class="modal-head">
+            <h3>Configuración</h3>
+            <button class="modal-close" onclick="closeAllModals()">&times;</button>
+        </div>
+        <div class="field">
+            <label>Pie de página (redes / contacto)</label>
+            <input type="text" id="fFooter" placeholder="@bohr.cerveza · +54 9 11 ...">
+        </div>
+        <div class="modal-actions">
+            <button class="btn btn-ghost" onclick="closeAllModals()">Cerrar</button>
+            <button class="btn btn-primary" onclick="saveSettings()">Guardar</button>
+        </div>
+    </div>
+</div>
+
+<!-- ── MODAL: Historial ── -->
+<div class="modal-overlay hidden" id="modalHistory">
+    <div class="modal-box wide">
+        <div class="modal-head">
+            <h3>Historial de Versiones</h3>
+            <button class="modal-close" onclick="closeAllModals()">&times;</button>
+        </div>
+        <div class="history-modal-list" id="historyModalList"></div>
+        <div class="modal-actions">
+            <button class="btn btn-ghost" onclick="closeAllModals()">Cerrar</button>
+        </div>
+    </div>
+</div>
+
+<script src="js/app.js"></script>
+</body>
+</html>
