@@ -1,22 +1,55 @@
 // ─── CONSTANTS ────────────────────────────────────────────
 const DEFAULT_BEER_STYLES = [
-    'PILSEN', 'SCOTTISH', 'HONEY', 'DRY STOUT', 'JAMMIN IPA',
-    'SESSION IPA', 'COCO AMBER ALE', 'SOUR', 'BARLEY WINE',
-    'DOBLE JAMMIN IPA', 'CAIPI LAGER'
+    { name: 'PILSEN',             desc: '' },
+    { name: 'SCOTTISH',           desc: '' },
+    { name: 'HONEY 🍯',           desc: '' },
+    { name: 'DRY STOUT',          desc: '' },
+    { name: 'JAMMIN IPA',         desc: '' },
+    { name: 'SESSION IPA',        desc: '' },
+    { name: 'COCO AMBER ALE 🥥',  desc: '' },
+    { name: 'SOUR',               desc: '' },
+    { name: 'BARLEY WINE',        desc: '' },
+    { name: 'DOBLE JAMMIN IPA',   desc: '' },
+    { name: 'CAIPI LAGER 🍋',     desc: 'Lager fresca con Lima' },
+    { name: 'KAI 0%',             desc: 'Session IPA sin alc.' },
 ];
 
-const DEFAULT_IMAGES = {
-    barriles: {
-        'Mayorista': 'assets/backgrounds/1.jpg',
-        'Minorista': 'assets/backgrounds/2.jpg',
-        'Amigos':    'assets/backgrounds/3.jpg'
-    },
-    latas: {
-        'Mayorista': 'assets/backgrounds/4.jpg',
-        'Minorista': 'assets/backgrounds/5.jpg',
-        'Amigos':    'assets/backgrounds/6.jpg'
-    }
+// Maps Excel column names → app style names
+const EXCEL_STYLE_MAP = {
+    'jammin ipa':     'JAMMIN IPA',
+    'scottish':       'SCOTTISH',
+    'honey':          'HONEY 🍯',
+    'pilsen':         'PILSEN',
+    'summer ale':     'PILSEN',          // latas equivalent of Pilsen
+    'session ipa':    'SESSION IPA',
+    'dry stout':      'DRY STOUT',
+    'coco amber ale': 'COCO AMBER ALE 🥥',
+    'sour':           'SOUR',
+    'barley':         'BARLEY WINE',
+    'barley wine':    'BARLEY WINE',
+    'kai':            'KAI 0%',
+    'caipi lager':    'CAIPI LAGER 🍋',
 };
+const EXCEL_IGNORE = new Set([
+    'ira', 'imperial stout', 'neipa', 'hazy dipa', 'triple a',
+    'comentarios negrito', 'cliente', 'doble jammin ipa'
+]);
+
+const MONTHS_ES = {
+    enero:1, febrero:2, marzo:3, abril:4, mayo:5, junio:6,
+    julio:7, agosto:8, septiembre:9, octubre:10, noviembre:11, diciembre:12
+};
+
+const DEFAULT_IMAGES = {
+    barriles: { 'Mayorista': 'assets/backgrounds/1.jpg', 'Minorista': 'assets/backgrounds/2.jpg', 'Amigos': 'assets/backgrounds/3.jpg' },
+    latas:    { 'Mayorista': 'assets/backgrounds/4.jpg', 'Minorista': 'assets/backgrounds/5.jpg', 'Amigos': 'assets/backgrounds/6.jpg' }
+};
+
+const BG_IMAGES_POOL = [
+    'assets/backgrounds/1.jpg', 'assets/backgrounds/2.jpg',
+    'assets/backgrounds/3.jpg', 'assets/backgrounds/4.jpg',
+    'assets/backgrounds/5.jpg', 'assets/backgrounds/6.jpg'
+];
 
 // ─── STATE ────────────────────────────────────────────────
 let state = {
@@ -24,27 +57,26 @@ let state = {
     products: [],
     history: [],
     defaultsLoaded: false,
-    settings: {
-        footerText: 'CONTACTO / REDES SOCIALES',
-        customImages: {}
-    }
+    clientImageIndex: {},   // clientName → bgIndex (0-5)
+    settings: { footerText: 'CONTACTO / REDES SOCIALES', customImages: {} }
 };
 
 let currentLine     = 'barriles';
 let currentListType = 'Mayorista';
 let increaseType    = 'percent';
+let sidebarSearch   = '';
 
 // ─── DEFAULTS ─────────────────────────────────────────────
 function initDefaultProducts() {
-    const formats = { barriles: 'Barril 50L', latas: 'Lata 473cc' };
     ['barriles', 'latas'].forEach(line => {
         state.listTypes.forEach(listType => {
-            DEFAULT_BEER_STYLES.forEach((name, idx) => {
+            DEFAULT_BEER_STYLES.forEach((style, idx) => {
                 state.products.push({
                     id: `default_${line}_${listType}_${idx}`,
-                    line, listType, name,
-                    format: formats[line],
-                    price: 0, abv: '', ibu: '', description: ''
+                    line, listType,
+                    name: style.name,
+                    format: line === 'barriles' ? 'Barril 50L' : 'Lata 473cc',
+                    price: 0, abv: '', ibu: '', description: style.desc
                 });
             });
         });
@@ -67,6 +99,7 @@ async function loadState() {
             if (!state.settings) state.settings = { footerText: 'CONTACTO / REDES SOCIALES', customImages: {} };
             if (!state.settings.customImages) state.settings.customImages = {};
             if (!state.history) state.history = [];
+            if (!state.clientImageIndex) state.clientImageIndex = {};
         } catch(e) { console.warn('State parse error', e); }
     }
 
@@ -75,7 +108,6 @@ async function loadState() {
         state.defaultsLoaded = true;
         await saveState();
     }
-
     currentListType = state.listTypes[0] || 'Mayorista';
 }
 
@@ -90,8 +122,8 @@ async function saveState() {
         try {
             const slim = { ...state, settings: { ...state.settings, customImages: {} } };
             localStorage.setItem('bohr_v2', JSON.stringify(slim));
-            showToast('⚠️ Espacio lleno: imágenes no guardadas');
-        } catch(e2) { console.error('Cannot save state:', e2); }
+            showToast('⚠️ Espacio lleno: imágenes custom no guardadas');
+        } catch(e2) { console.error('Cannot save:', e2); }
     }
 }
 
@@ -135,6 +167,23 @@ function setupEvents() {
     document.getElementById('btnGenerate').onclick     = generateJpg;
     document.getElementById('btnIncrease').onclick     = openIncreaseModal;
 
+    // Excel import
+    document.getElementById('excelInput').onchange = async function() {
+        if (this.files && this.files[0]) {
+            const file = this.files[0];
+            this.value = '';
+            await importExcel(file);
+        }
+    };
+    document.getElementById('btnImportExcel').onclick = () =>
+        document.getElementById('excelInput').click();
+
+    // Sidebar search
+    document.getElementById('sidebarSearch').oninput = function() {
+        sidebarSearch = this.value;
+        renderSidebar();
+    };
+
     document.getElementById('previewImageInput').onchange = function() {
         if (this.files && this.files[0]) {
             processImage(this.files[0], base64 => {
@@ -152,6 +201,189 @@ function setupEvents() {
         m.addEventListener('click', e => { if (e.target === m) closeAllModals(); });
     });
     document.addEventListener('keydown', e => { if (e.key === 'Escape') closeAllModals(); });
+}
+
+// ─── EXCEL IMPORT ────────────────────────────────────────
+async function importExcel(file) {
+    if (!window.XLSX) {
+        alert('La librería de Excel no está cargada. Revisá tu conexión a internet.');
+        return;
+    }
+
+    showToast('⏳ Procesando Excel...');
+
+    return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = async (e) => {
+            try {
+                const data  = new Uint8Array(e.target.result);
+                const wb    = XLSX.read(data, { type: 'array' });
+                const found = findMostRecentSheets(wb);
+
+                if (!found.barrilesSheet) {
+                    alert('No se encontró una hoja de Barriles válida.\nAsegurate que el Excel tenga hojas con "Precios x Cliente" en el nombre.');
+                    return;
+                }
+
+                let importedBarriles = 0, importedLatas = 0;
+
+                importedBarriles = importSheetData(wb, found.barrilesSheet, 'barriles');
+                if (found.latasSheet) {
+                    importedLatas = importSheetData(wb, found.latasSheet, 'latas');
+                }
+
+                await saveState();
+                renderSidebar();
+                renderAll();
+
+                const msg = `✓ ${importedBarriles} clientes en Barriles` +
+                    (importedLatas ? `, ${importedLatas} en Latas` : '') +
+                    ` — ${found.monthLabel}`;
+                showToast(msg);
+                resolve(importedBarriles + importedLatas);
+
+            } catch(err) {
+                console.error('Import error:', err);
+                alert('Error al procesar el Excel:\n' + err.message);
+                resolve(0);
+            }
+        };
+        reader.readAsArrayBuffer(file);
+    });
+}
+
+function findMostRecentSheets(wb) {
+    let best = { score: -1, barrilesSheet: null, latasSheet: null, monthLabel: '' };
+
+    wb.SheetNames.forEach((name, idx) => {
+        const lower = name.toLowerCase();
+        const isPriceSheet = lower.includes('precios x cliente') || lower.includes('precio x cliente');
+        if (!isPriceSheet) return;
+
+        // Parse month + year
+        let monthNum = 0, year = 2025;
+        for (const [m, n] of Object.entries(MONTHS_ES)) {
+            if (lower.includes(m)) { monthNum = n; break; }
+        }
+        const yearMatch = name.match(/\d{4}/);
+        if (yearMatch) year = parseInt(yearMatch[0]);
+
+        const score = year * 12 + monthNum;
+        if (score > best.score) {
+            best.score        = score;
+            best.barrilesSheet = name;
+            best.monthLabel   = name.trim().replace(/\s+/g, ' ');
+            best.latasSheet   = null;
+
+            // Find next sheet with client data = LATAS
+            for (let i = idx + 1; i < wb.SheetNames.length; i++) {
+                const nextName = wb.SheetNames[i];
+                const nextWs   = wb.Sheets[nextName];
+                if (nextWs && sheetHasClientData(wb, nextName)) {
+                    best.latasSheet = nextName;
+                    break;
+                }
+            }
+        }
+    });
+
+    return best;
+}
+
+function sheetHasClientData(wb, sheetName) {
+    const ws = wb.Sheets[sheetName];
+    if (!ws || !ws['!ref']) return false;
+    const range = XLSX.utils.decode_range(ws['!ref']);
+    for (let r = 3; r <= Math.min(range.e.r, 10); r++) {
+        const cell = ws[XLSX.utils.encode_cell({ r, c: 1 })];
+        if (cell && cell.v) return true;
+    }
+    return false;
+}
+
+function importSheetData(wb, sheetName, line) {
+    const ws = wb.Sheets[sheetName];
+    if (!ws || !ws['!ref']) return 0;
+
+    const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: null });
+    if (rows.length < 4) return 0;
+
+    // Row 3 (index 2) = headers
+    const headers   = rows[2] || [];
+    const clientCol = headers.findIndex(h => h && String(h).toLowerCase().trim() === 'cliente');
+    if (clientCol === -1) return 0;
+
+    // Build colIndex → appStyleName
+    const colMap = {};
+    headers.forEach((h, i) => {
+        if (!h || i === clientCol || i === 0) return;
+        const key = String(h).toLowerCase().trim();
+        if (EXCEL_IGNORE.has(key)) return;
+        const appStyle = EXCEL_STYLE_MAP[key];
+        if (appStyle) colMap[i] = appStyle;
+    });
+
+    let importedCount = 0;
+    // Rotating background index counter for new clients
+    let newClientCount = Object.keys(state.clientImageIndex).length;
+
+    for (let r = 3; r < rows.length; r++) {
+        const row        = rows[r];
+        const clientName = row[clientCol];
+        if (!clientName) continue;
+        const clientStr = String(clientName).trim();
+        if (!clientStr) continue;
+
+        // Create list type if not exists
+        if (!state.listTypes.includes(clientStr)) {
+            state.listTypes.push(clientStr);
+            // Assign rotating background image
+            if (!state.clientImageIndex[clientStr]) {
+                state.clientImageIndex[clientStr] = newClientCount % BG_IMAGES_POOL.length;
+                newClientCount++;
+            }
+            // Create default products for all lines/this client
+            ['barriles', 'latas'].forEach(l => {
+                DEFAULT_BEER_STYLES.forEach((style, idx) => {
+                    state.products.push({
+                        id: `${l}_${clientStr}_${idx}_${Date.now()}_${Math.random().toString(36).slice(2)}`,
+                        line: l, listType: clientStr, name: style.name,
+                        format: l === 'barriles' ? 'Barril 50L' : 'Lata 473cc',
+                        price: 0, abv: '', ibu: '', description: style.desc || ''
+                    });
+                });
+            });
+        }
+
+        // Update prices from this sheet
+        let pilsenPrice = 0;
+
+        Object.entries(colMap).forEach(([colIdx, appStyle]) => {
+            const rawVal = row[parseInt(colIdx)];
+            if (rawVal === null || rawVal === undefined) return;
+            const price = parseFloat(rawVal) || 0;
+            if (price <= 0) return;
+
+            if (appStyle === 'PILSEN') pilsenPrice = price;
+
+            const pIdx = state.products.findIndex(p =>
+                p.line === line && p.listType === clientStr && p.name === appStyle);
+            if (pIdx > -1) state.products[pIdx].price = price;
+        });
+
+        // CAIPI LAGER = Pilsen price if not in Excel or 0
+        if (pilsenPrice > 0) {
+            const cIdx = state.products.findIndex(p =>
+                p.line === line && p.listType === clientStr && p.name === 'CAIPI LAGER 🍋');
+            if (cIdx > -1 && state.products[cIdx].price === 0) {
+                state.products[cIdx].price = pilsenPrice;
+            }
+        }
+
+        importedCount++;
+    }
+
+    return importedCount;
 }
 
 // ─── RENDER ───────────────────────────────────────────────
@@ -174,11 +406,17 @@ function renderTopbar() {
 
 function renderSidebar() {
     const container = document.getElementById('listTypesNav');
+    const query     = sidebarSearch.toLowerCase().trim();
+    const visible   = query
+        ? state.listTypes.filter(t => t.toLowerCase().includes(query))
+        : state.listTypes;
+
     container.innerHTML = '';
-    state.listTypes.forEach(type => {
+    visible.forEach(type => {
         const btn = document.createElement('button');
         btn.className = `nav-item ${type === currentListType ? 'active' : ''}`;
-        btn.innerHTML = `${window.getIconSVG('fa-list-ul')} ${type}`;
+        btn.innerHTML = `${window.getIconSVG('fa-list-ul')} <span class="nav-item-label">${type}</span>`;
+
         if (state.listTypes.length > 1) {
             const del = document.createElement('span');
             del.className = 'del-list';
@@ -193,6 +431,14 @@ function renderSidebar() {
         btn.onclick = () => { currentListType = type; renderSidebar(); renderAll(); };
         container.appendChild(btn);
     });
+
+    // Update count badge
+    const badge = document.getElementById('listCountBadge');
+    if (badge) {
+        badge.textContent = query
+            ? `${visible.length}/${state.listTypes.length}`
+            : `${state.listTypes.length}`;
+    }
 }
 
 function renderProducts() {
@@ -224,8 +470,8 @@ function renderProducts() {
                 <td>${priceDisplay}</td>
                 <td class="td-actions">
                     <div class="row-actions">
-                        <button class="btn-row" onclick="editProduct('${p.id}')" title="Editar">${window.getIconSVG('fa-pen')}</button>
-                        <button class="btn-row del" onclick="deleteProduct('${p.id}')" title="Eliminar">${window.getIconSVG('fa-trash')}</button>
+                        <button class="btn-row" onclick="editProduct('${p.id}')">${window.getIconSVG('fa-pen')}</button>
+                        <button class="btn-row del" onclick="deleteProduct('${p.id}')">${window.getIconSVG('fa-trash')}</button>
                     </div>
                 </td>`;
             tbody.appendChild(tr);
@@ -243,11 +489,11 @@ function renderPreview() {
 
     if (img) {
         bgEl.src = img;
-        bgEl.style.display = '';
+        bgEl.style.display  = '';
         overlay.style.display = '';
         inner.style.background = 'transparent';
     } else {
-        bgEl.style.display = 'none';
+        bgEl.style.display  = 'none';
         overlay.style.display = 'none';
         inner.style.background = currentLine === 'barriles' ? '#ffd85e' : '#f2a99d';
     }
@@ -257,12 +503,12 @@ function renderPreview() {
     if (img) {
         if (logoImg) logoImg.style.filter = 'none';
         badgeEl.style.color = 'white';
-        badgeEl.style.background = 'rgba(0,0,0,0.3)';
+        badgeEl.style.background  = 'rgba(0,0,0,0.3)';
         badgeEl.style.borderColor = 'rgba(255,255,255,0.2)';
     } else {
         if (logoImg) logoImg.style.filter = 'brightness(0)';
         badgeEl.style.color = '#333';
-        badgeEl.style.background = 'rgba(0,0,0,0.1)';
+        badgeEl.style.background  = 'rgba(0,0,0,0.1)';
         badgeEl.style.borderColor = 'rgba(0,0,0,0.15)';
     }
     badgeEl.textContent = currentListType.toUpperCase();
@@ -284,19 +530,19 @@ function renderPreview() {
 
 function renderImageStatus() {
     const custom     = state.settings.customImages[currentListType]?.[currentLine];
-    const hasDefault = !!(DEFAULT_IMAGES[currentLine]?.[currentListType]);
-    const zone       = document.getElementById('uploadZone');
-    const status     = document.getElementById('imageStatus');
-    const statusText = document.getElementById('imageStatusText');
+    const hasDefault = !!(getDefaultImageForCurrent());
+    const zone   = document.getElementById('uploadZone');
+    const status = document.getElementById('imageStatus');
+    const txt    = document.getElementById('imageStatusText');
 
     if (custom) {
         zone.style.display = 'none';
         status.classList.remove('hidden');
-        if (statusText) statusText.textContent = 'Imagen personalizada activa';
+        if (txt) txt.textContent = 'Imagen personalizada activa';
     } else if (hasDefault) {
         zone.style.display = 'none';
         status.classList.remove('hidden');
-        if (statusText) statusText.textContent = 'Imagen predeterminada activa';
+        if (txt) txt.textContent = 'Imagen predeterminada activa';
     } else {
         zone.style.display = '';
         status.classList.add('hidden');
@@ -307,10 +553,9 @@ function renderHistory() {
     const relevant = state.history
         .filter(h => h.line === currentLine && h.listType === currentListType)
         .sort((a, b) => b.date - a.date).slice(0, 5);
-
     const container = document.getElementById('historyList');
     if (relevant.length === 0) {
-        container.innerHTML = '<div style="font-size:0.8rem; color:var(--text-3); padding:10px 0;">Sin versiones. Guardá antes de cambiar precios.</div>';
+        container.innerHTML = '<div style="font-size:0.8rem;color:var(--text-3);padding:10px 0;">Sin versiones guardadas aún.</div>';
         return;
     }
     container.innerHTML = relevant.map(h => `
@@ -328,7 +573,7 @@ function openProductModal(id) {
     const modal   = document.getElementById('modalProduct');
     const editing = id ? state.products.find(p => p.id === id) : null;
 
-    document.getElementById('modalProductTitle').textContent = editing ? 'Editar Producto' : 'Nuevo Producto';
+    document.getElementById('modalProductTitle').textContent = editing ? 'Editar Estilo' : 'Nuevo Estilo';
     document.getElementById('fId').value     = editing ? editing.id : '';
     document.getElementById('fName').value   = editing ? editing.name : '';
     document.getElementById('fFormat').value = editing ? editing.format : (currentLine === 'barriles' ? 'Barril 50L' : 'Lata 473cc');
@@ -350,7 +595,7 @@ function submitProduct() {
     const ibu    = document.getElementById('fIbu').value.trim();
     const desc   = document.getElementById('fDesc').value.trim();
 
-    if (!name || !format) { alert('Completá al menos Nombre y Formato.'); return; }
+    if (!name || !format) { alert('Completá Nombre y Formato.'); return; }
 
     const existing = state.products.findIndex(p => p.id === id);
     const product  = { id, line: currentLine, listType: currentListType, name, format, price, abv, ibu, description: desc };
@@ -365,7 +610,7 @@ function submitProduct() {
 
 window.editProduct   = id => openProductModal(id);
 window.deleteProduct = id => {
-    if (confirm('¿Eliminar este estilo de la lista?')) {
+    if (confirm('¿Eliminar este estilo?')) {
         state.products = state.products.filter(p => p.id !== id);
         saveState();
         renderAll();
@@ -376,17 +621,22 @@ window.deleteProduct = id => {
 function submitListType() {
     const name = document.getElementById('fListName').value.trim();
     if (!name) return;
-    if (state.listTypes.includes(name)) { alert('Ya existe una lista con ese nombre.'); return; }
+    if (state.listTypes.includes(name)) { alert('Ya existe.'); return; }
 
     state.listTypes.push(name);
-    const formats = { barriles: 'Barril 50L', latas: 'Lata 473cc' };
-    ['barriles', 'latas'].forEach(line => {
-        DEFAULT_BEER_STYLES.forEach((styleName, idx) => {
+
+    // Assign background image
+    const usedCount = Object.keys(state.clientImageIndex).length;
+    state.clientImageIndex[name] = usedCount % BG_IMAGES_POOL.length;
+
+    // Create default products
+    ['barriles', 'latas'].forEach(l => {
+        DEFAULT_BEER_STYLES.forEach((style, idx) => {
             state.products.push({
-                id: `${line}_${name}_${idx}_${Date.now()}`,
-                line, listType: name, name: styleName,
-                format: formats[line],
-                price: 0, abv: '', ibu: '', description: ''
+                id: `${l}_${name}_${idx}_${Date.now()}`,
+                line: l, listType: name, name: style.name,
+                format: l === 'barriles' ? 'Barril 50L' : 'Lata 473cc',
+                price: 0, abv: '', ibu: '', description: style.desc || ''
             });
         });
     });
@@ -403,6 +653,7 @@ function deleteListType(type) {
     state.products  = state.products.filter(p => p.listType !== type);
     state.history   = state.history.filter(h => h.listType !== type);
     delete state.settings.customImages[type];
+    delete state.clientImageIndex[type];
     currentListType = state.listTypes[0] || '';
     saveState();
     renderSidebar();
@@ -419,8 +670,7 @@ function saveSettings() {
 // ─── HISTORY ──────────────────────────────────────────────
 function saveSnapshot() {
     const filtered = getFiltered().filter(p => p.price > 0);
-    if (filtered.length === 0) { alert('No hay precios en esta lista para guardar.'); return; }
-
+    if (filtered.length === 0) { alert('No hay precios para guardar.'); return; }
     const label = `${currentLine === 'barriles' ? 'Barriles' : 'Latas'} · ${currentListType}`;
     const snap  = {
         id: Date.now().toString(), date: Date.now(),
@@ -436,10 +686,9 @@ function saveSnapshot() {
 
 function openHistoryModal() {
     const container = document.getElementById('historyModalList');
-    const all       = [...state.history].sort((a, b) => b.date - a.date);
-
+    const all = [...state.history].sort((a, b) => b.date - a.date);
     container.innerHTML = all.length === 0
-        ? '<div style="color:var(--text-3);font-size:0.85rem;padding:20px;text-align:center;">Sin versiones guardadas todavía.</div>'
+        ? '<div style="color:var(--text-3);font-size:0.85rem;padding:20px;text-align:center;">Sin versiones guardadas.</div>'
         : all.map(h => `
             <div class="history-modal-item">
                 <div>
@@ -453,37 +702,31 @@ function openHistoryModal() {
                     ${window.getIconSVG('fa-rotate-left')} Restaurar
                 </button>
             </div>`).join('');
-
     document.getElementById('modalHistory').classList.remove('hidden');
 }
 
 window.restoreSnapshot = function(id) {
     const snap = state.history.find(h => h.id === id);
     if (!snap || !confirm(`¿Restaurar precios del ${formatDate(snap.date)}?`)) return;
-
     snap.products.forEach(sp => {
         const idx = state.products.findIndex(p =>
             p.name === sp.name && p.line === sp.line && p.listType === sp.listType);
         if (idx > -1) state.products[idx].price = sp.price;
         else state.products.push({ ...sp });
     });
-
-    currentLine     = snap.line;
+    currentLine = snap.line;
     currentListType = snap.listType;
     saveState();
     closeAllModals();
     renderSidebar();
-    document.querySelectorAll('.nav-item[data-view]').forEach(b => {
-        b.classList.toggle('active', b.dataset.view === currentLine);
-    });
+    document.querySelectorAll('.nav-item[data-view]').forEach(b =>
+        b.classList.toggle('active', b.dataset.view === currentLine));
     renderAll();
     showToast('✓ Versión restaurada');
 };
 
 // ─── PRICE INCREASE ───────────────────────────────────────
-function roundUpTo50(value) {
-    return Math.ceil(value / 50) * 50;
-}
+function roundUpTo50(v) { return Math.ceil(v / 50) * 50; }
 
 function setIncreaseType(type) {
     increaseType = type;
@@ -503,11 +746,9 @@ function getProductsForScope() {
     return state.products.filter(p => p.price > 0);
 }
 
-function calcNewPrice(oldPrice, val) {
-    if (!oldPrice || oldPrice <= 0) return 0;
-    const raw = increaseType === 'percent'
-        ? oldPrice * (1 + val / 100)
-        : oldPrice + val;
+function calcNewPrice(old, val) {
+    if (!old || old <= 0) return 0;
+    const raw = increaseType === 'percent' ? old * (1 + val / 100) : old + val;
     return roundUpTo50(raw);
 }
 
@@ -520,7 +761,6 @@ function updateIncreasePreview() {
         preview.innerHTML = `<div style="color:var(--text-3);font-size:0.8rem;text-align:center;padding:16px;">Ingresá un valor para ver la previsualización</div>`;
         return;
     }
-
     const rows = prods.slice(0, 12).map(p => {
         const np = calcNewPrice(p.price, val);
         return `<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid var(--border);font-size:0.8rem;">
@@ -528,22 +768,18 @@ function updateIncreasePreview() {
             <span>
                 <span style="color:var(--text-3);text-decoration:line-through;margin-right:8px;">$${Number(p.price).toLocaleString('es-AR')}</span>
                 <span style="color:var(--green);font-weight:700;">$${Number(np).toLocaleString('es-AR')}</span>
-            </span>
-        </div>`;
+            </span></div>`;
     }).join('');
-
     const extra = prods.length > 12
-        ? `<div style="color:var(--text-3);font-size:0.75rem;text-align:center;padding:6px;">+ ${prods.length - 12} más</div>`
-        : '';
-
+        ? `<div style="color:var(--text-3);font-size:0.75rem;text-align:center;padding:6px;">+ ${prods.length - 12} más</div>` : '';
     preview.innerHTML = rows + extra;
 }
 
 function openIncreaseModal() {
-    const lineLabel = currentLine === 'barriles' ? 'Barriles' : 'Latas';
+    const lbl = currentLine === 'barriles' ? 'Barriles' : 'Latas';
     document.getElementById('fIncreaseScope').innerHTML = `
-        <option value="current">Esta lista — ${lineLabel} · ${currentListType}</option>
-        <option value="line">Toda la línea — ${lineLabel}</option>
+        <option value="current">Esta lista — ${lbl} · ${currentListType}</option>
+        <option value="line">Toda la línea — ${lbl}</option>
         <option value="all">Todas las listas</option>`;
     document.getElementById('fIncreaseValue').value = '';
     document.getElementById('increasePreview').innerHTML =
@@ -556,15 +792,12 @@ function openIncreaseModal() {
 async function confirmIncrease() {
     const val = parseFloat(document.getElementById('fIncreaseValue').value);
     if (!val || val <= 0) { alert('Ingresá un valor mayor a 0.'); return; }
-
     const prods = getProductsForScope();
-    if (prods.length === 0) { alert('No hay precios para actualizar en el alcance seleccionado.'); return; }
-
+    if (prods.length === 0) { alert('No hay precios para actualizar.'); return; }
     prods.forEach(p => {
         const idx = state.products.findIndex(x => x.id === p.id);
         if (idx > -1) state.products[idx].price = calcNewPrice(p.price, val);
     });
-
     await saveState();
     closeAllModals();
     renderAll();
@@ -572,10 +805,20 @@ async function confirmIncrease() {
 }
 
 // ─── IMAGES ───────────────────────────────────────────────
+function getDefaultImageForCurrent() {
+    // Fixed lists use DEFAULT_IMAGES map
+    const fixed = DEFAULT_IMAGES[currentLine]?.[currentListType];
+    if (fixed) return fixed;
+    // Client lists use rotating pool
+    const idx = state.clientImageIndex?.[currentListType];
+    if (idx !== undefined) return BG_IMAGES_POOL[idx % BG_IMAGES_POOL.length];
+    return '';
+}
+
 function getCurrentImage() {
     const custom = state.settings.customImages[currentListType]?.[currentLine];
     if (custom) return custom;
-    return DEFAULT_IMAGES[currentLine]?.[currentListType] || '';
+    return getDefaultImageForCurrent();
 }
 
 window.clearCurrentImage = function() {
@@ -591,16 +834,13 @@ function processImage(file, cb) {
     reader.onload = e => {
         const img = new Image();
         img.onload = () => {
-            const TARGET_W = 1080, TARGET_H = 1920;
-            const canvas   = document.createElement('canvas');
-            canvas.width   = TARGET_W;
-            canvas.height  = TARGET_H;
-            const ctx      = canvas.getContext('2d');
-            const scale    = Math.max(TARGET_W / img.width, TARGET_H / img.height);
-            const drawW    = img.width  * scale;
-            const drawH    = img.height * scale;
-            ctx.drawImage(img, (TARGET_W - drawW) / 2, (TARGET_H - drawH) / 2, drawW, drawH);
-            cb(canvas.toDataURL('image/jpeg', 0.88));
+            const TW = 1080, TH = 1920;
+            const c  = document.createElement('canvas');
+            c.width  = TW; c.height = TH;
+            const ctx = c.getContext('2d');
+            const sc  = Math.max(TW / img.width, TH / img.height);
+            ctx.drawImage(img, (TW - img.width*sc)/2, (TH - img.height*sc)/2, img.width*sc, img.height*sc);
+            cb(c.toDataURL('image/jpeg', 0.88));
         };
         img.src = e.target.result;
     };
@@ -610,7 +850,7 @@ function processImage(file, cb) {
 // ─── EXPORT ───────────────────────────────────────────────
 async function generateJpg() {
     const filtered = getFiltered().filter(p => p.price > 0);
-    if (filtered.length === 0) { alert('No hay precios cargados para exportar.'); return; }
+    if (filtered.length === 0) { alert('No hay precios para exportar.'); return; }
 
     const wrap    = document.getElementById('exportWrap');
     const canvas  = document.getElementById('exportCanvas');
@@ -623,8 +863,8 @@ async function generateJpg() {
     const ecOverlay = document.querySelector('#exportCanvas .ec-overlay');
 
     if (imgSrc) {
-        ecBg.crossOrigin = 'anonymous';
-        ecBg.src = imgSrc;
+        ecBg.crossOrigin  = 'anonymous';
+        ecBg.src          = imgSrc;
         ecBg.style.display = '';
         if (ecOverlay) ecOverlay.style.display = '';
     } else {
@@ -634,7 +874,7 @@ async function generateJpg() {
     }
 
     document.getElementById('ecListBadge').textContent = currentListType.toUpperCase();
-    document.getElementById('ecLineLabel').textContent  = currentLine === 'barriles' ? 'BARRIL' : 'LATA';
+    document.getElementById('ecLineLabel').textContent = currentLine === 'barriles' ? 'BARRIL' : 'LATA';
 
     const logoImg  = document.getElementById('ecLogoImg');
     const lineEl   = document.getElementById('ecLineLabel');
@@ -648,9 +888,9 @@ async function generateJpg() {
         if (footerEl) footerEl.style.color  = 'rgba(255,255,255,0.7)';
     } else {
         if (logoImg)  logoImg.style.filter  = 'brightness(0)';
-        if (lineEl)   lineEl.style.color    = '#666666';
+        if (lineEl)   lineEl.style.color    = '#666';
         if (badgeEl)  { badgeEl.style.color = '#222'; badgeEl.style.background = 'rgba(0,0,0,0.10)'; badgeEl.style.borderColor = 'rgba(0,0,0,0.12)'; }
-        if (footerEl) footerEl.style.color  = '#555555';
+        if (footerEl) footerEl.style.color  = '#555';
     }
     if (footerEl) footerEl.textContent = state.settings.footerText || '';
 
@@ -659,31 +899,23 @@ async function generateJpg() {
             <div>
                 <span class="ec-price-name">${p.name}</span>
                 ${p.format ? `<span class="ec-price-extras">${p.format}</span>` : ''}
-                ${p.abv    ? `<span class="ec-price-extras">${p.abv}</span>`    : ''}
+                ${p.abv    ? `<span class="ec-price-extras">${p.abv}</span>` : ''}
             </div>
             <span class="ec-price-val">$${Number(p.price).toLocaleString('es-AR')}</span>
         </div>`).join('');
 
-    wrap.style.left    = '0';
-    wrap.style.top     = '0';
-    wrap.style.opacity = '1';
-    wrap.style.zIndex  = '-9999';
-
+    wrap.style.cssText = 'position:fixed;top:0;left:0;opacity:1;z-index:-9999;pointer-events:none;';
     const filename = `Lista_Bohr_${currentLine}_${currentListType}_${new Date().toLocaleDateString('es-AR').replace(/\//g,'-')}.jpg`;
 
     const doCapture = () => {
         html2canvas(canvas, { scale: 2, useCORS: true, allowTaint: true, logging: false }).then(c => {
-            wrap.style.left    = '-9999px';
-            wrap.style.opacity = '0';
+            wrap.style.cssText = 'position:fixed;top:0;left:-9999px;opacity:0;pointer-events:none;';
             const dataUrl = c.toDataURL('image/jpeg', 0.92);
             if (window.pywebview && window.pywebview.api) {
-                window.pywebview.api.save_image(dataUrl, filename)
-                    .then(ok => { if (ok) showToast('✓ Imagen guardada'); });
+                window.pywebview.api.save_image(dataUrl, filename).then(ok => { if (ok) showToast('✓ Imagen guardada'); });
             } else {
                 const a = document.createElement('a');
-                a.download = filename;
-                a.href = dataUrl;
-                a.click();
+                a.download = filename; a.href = dataUrl; a.click();
                 showToast('✓ JPG descargado');
             }
         });
@@ -709,8 +941,7 @@ function getFiltered() {
 
 function formatDate(ts) {
     return new Date(ts).toLocaleString('es-AR', {
-        day: '2-digit', month: 'short', year: 'numeric',
-        hour: '2-digit', minute: '2-digit'
+        day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
     });
 }
 
@@ -726,11 +957,11 @@ function showToast(msg) {
         zIndex: '9999', animation: 'fadeInUp 0.3s ease'
     });
     document.body.appendChild(t);
-    setTimeout(() => t.remove(), 2500);
+    setTimeout(() => t.remove(), 3000);
 }
 
-const _style = document.createElement('style');
-_style.textContent = '@keyframes fadeInUp { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:none; } }';
-document.head.appendChild(_style);
+const _s = document.createElement('style');
+_s.textContent = '@keyframes fadeInUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}';
+document.head.appendChild(_s);
 
 window.addEventListener('DOMContentLoaded', init);

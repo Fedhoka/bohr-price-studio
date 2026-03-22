@@ -6,6 +6,7 @@
     <title>BOHR · Price Studio</title>
     <link rel="stylesheet" href="css/style.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="js/icons.js"></script>
 </head>
 <body>
@@ -18,6 +19,7 @@
             <img src="assets/bohr-logo.png" class="sidebar-logo-img" alt="BOHR">
             <div class="logo-sub">Price Studio</div>
         </div>
+
         <nav class="sidebar-nav">
             <div class="nav-section-label">Línea</div>
             <button class="nav-item active" data-view="barriles">
@@ -26,12 +28,23 @@
             <button class="nav-item" data-view="latas">
                 <i class="fas fa-box"></i> Latas
             </button>
-            <div class="nav-section-label">
-                Tipos de Lista
-                <button class="add-btn-xs" id="btnAddListType" title="Nueva lista">+</button>
+
+            <div class="nav-section-label" style="margin-top:20px;">
+                Listas
+                <div style="display:flex;align-items:center;gap:6px;">
+                    <span id="listCountBadge" style="font-size:0.65rem;background:rgba(245,166,35,0.15);color:var(--amber);border:1px solid rgba(245,166,35,0.2);border-radius:99px;padding:1px 7px;font-weight:600;"></span>
+                    <button class="add-btn-xs" id="btnAddListType" title="Nueva lista">+</button>
+                </div>
             </div>
+
+            <!-- Search -->
+            <div class="sidebar-search-wrap">
+                <input type="text" id="sidebarSearch" placeholder="Buscar cliente..." class="sidebar-search-input" autocomplete="off">
+            </div>
+
             <div id="listTypesNav"></div>
         </nav>
+
         <div class="sidebar-footer">
             <button class="nav-item" id="btnSettings" style="width:100%;">
                 <i class="fas fa-gear"></i> Configuración
@@ -43,10 +56,16 @@
     <main class="main-panel">
         <header class="topbar">
             <div class="topbar-left">
-                <div class="page-title">Lista: <span id="titleLine">Barriles</span> · <span id="titleList" style="color:var(--text-2);font-weight:400;">Mayorista</span></div>
+                <div class="page-title">
+                    Lista: <span id="titleLine">Barriles</span> · <span id="titleList" style="color:var(--text-2);font-weight:400;">Mayorista</span>
+                </div>
                 <div class="page-sub" id="pageSubCount">0 estilos</div>
             </div>
             <div class="topbar-actions">
+                <button class="btn btn-secondary" id="btnImportExcel" title="Importar desde Excel" style="color:#4ade80;border-color:rgba(74,222,128,0.3);">
+                    <i class="fas fa-floppy-disk"></i> Importar Excel
+                </button>
+                <input type="file" id="excelInput" accept=".xlsx,.xls" style="display:none;">
                 <button class="btn btn-secondary" id="btnHistory">
                     <i class="fas fa-clock-rotate-left"></i> Historial
                 </button>
@@ -86,7 +105,7 @@
                 </table>
                 <div id="emptyState" class="empty-state hidden">
                     <i class="fas fa-beer"></i>
-                    <p>Sin estilos. Los predeterminados se cargan al iniciar.</p>
+                    <p>Sin estilos cargados.</p>
                 </div>
             </div>
 
@@ -140,7 +159,7 @@
 </div>
 
 <!-- ── EXPORT CANVAS ── -->
-<div class="export-wrap" id="exportWrap">
+<div class="export-wrap" id="exportWrap" style="position:fixed;top:0;left:-9999px;opacity:0;pointer-events:none;">
     <div id="exportCanvas" class="export-canvas">
         <img id="ecBgImg" class="ec-bg-img" src="" alt="" crossorigin="anonymous">
         <div class="ec-overlay"></div>
@@ -165,7 +184,7 @@
         </div>
         <div class="field">
             <label>Nombre del Estilo</label>
-            <input type="text" id="fName" placeholder="Ej: IPA, Stout, Pale Ale...">
+            <input type="text" id="fName" placeholder="Ej: IPA, Stout...">
         </div>
         <div class="field-row">
             <div class="field">
@@ -179,16 +198,16 @@
         </div>
         <div class="field-row">
             <div class="field">
-                <label>ABV % <span style="color:var(--text-3);font-weight:400;">(opcional)</span></label>
+                <label>ABV % <span style="color:var(--text-3);font-weight:400;">(opc.)</span></label>
                 <input type="text" id="fAbv" placeholder="Ej: 6.5%">
             </div>
             <div class="field">
-                <label>IBU <span style="color:var(--text-3);font-weight:400;">(opcional)</span></label>
+                <label>IBU <span style="color:var(--text-3);font-weight:400;">(opc.)</span></label>
                 <input type="text" id="fIbu" placeholder="Ej: 45">
             </div>
         </div>
         <div class="field">
-            <label>Descripción <span style="color:var(--text-3);font-weight:400;">(opcional)</span></label>
+            <label>Descripción <span style="color:var(--text-3);font-weight:400;">(opc.)</span></label>
             <input type="text" id="fDesc" placeholder="Notas, maridaje, etc.">
         </div>
         <input type="hidden" id="fId">
@@ -206,37 +225,25 @@
             <h3>Aumentar Precios</h3>
             <button class="modal-close" onclick="closeAllModals()">&times;</button>
         </div>
-
         <div style="display:flex;gap:8px;margin-bottom:20px;">
             <button class="btn btn-primary" id="btnTogglePercent" onclick="setIncreaseType('percent')">% Porcentaje</button>
             <button class="btn btn-secondary" id="btnToggleFixed" onclick="setIncreaseType('fixed')">$ Monto fijo</button>
         </div>
-
         <div class="field">
             <label id="increaseLabel">Porcentaje de aumento (%)</label>
             <input type="number" id="fIncreaseValue" min="0" step="0.1" placeholder="Ej: 15" oninput="updateIncreasePreview()">
-            <div style="font-size:0.72rem;color:var(--text-3);margin-top:6px;">
-                Redondea hacia arriba al múltiplo de $50 más cercano
-            </div>
+            <div style="font-size:0.72rem;color:var(--text-3);margin-top:6px;">Redondea hacia arriba al múltiplo de $50 más cercano</div>
         </div>
-
         <div class="field">
             <label>Aplicar a</label>
             <select id="fIncreaseScope" onchange="updateIncreasePreview()"
                 style="width:100%;padding:10px 14px;background:var(--bg-card);border:1px solid var(--border-lit);border-radius:var(--radius-sm);color:var(--text-1);font-family:var(--font-ui);font-size:0.9rem;cursor:pointer;">
-                <option value="current">Esta lista</option>
-                <option value="line">Toda la línea</option>
-                <option value="all">Todas las listas</option>
             </select>
         </div>
-
         <div>
             <div style="font-size:0.7rem;font-weight:600;letter-spacing:1.5px;text-transform:uppercase;color:var(--text-3);margin-bottom:8px;">Previsualización</div>
-            <div id="increasePreview" style="background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px;max-height:220px;overflow-y:auto;">
-                <div style="color:var(--text-3);font-size:0.8rem;text-align:center;padding:16px;">Ingresá un valor para ver la previsualización</div>
-            </div>
+            <div id="increasePreview" style="background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px;max-height:220px;overflow-y:auto;"></div>
         </div>
-
         <div class="modal-actions">
             <button class="btn btn-ghost" onclick="closeAllModals()">Cancelar</button>
             <button class="btn btn-primary" onclick="confirmIncrease()">Aplicar aumento</button>
@@ -252,8 +259,8 @@
             <button class="modal-close" onclick="closeAllModals()">&times;</button>
         </div>
         <div class="field">
-            <label>Nombre</label>
-            <input type="text" id="fListName" placeholder="Ej: Revendedores, VIP...">
+            <label>Nombre del cliente / lista</label>
+            <input type="text" id="fListName" placeholder="Ej: Bar La Esquina, Distribuidora...">
         </div>
         <div class="modal-actions">
             <button class="btn btn-ghost" onclick="closeAllModals()">Cancelar</button>
