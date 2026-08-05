@@ -19,6 +19,24 @@
 
 ---
 
+## Importar el Excel
+
+1. Click en **"Importar Excel"** y elegí el archivo.
+2. Aparece un diálogo con las hojas encontradas (clientes, estilos y precio típico de cada una).
+   **Confirmá cuál es Barriles y cuál es Latas** — viene pre-seleccionado, pero revisalo.
+3. Al terminar se muestra un resumen: clientes y precios cargados, clientes/estilos nuevos y avisos.
+
+Reglas del importador:
+
+- **Manda el Excel.** Toda columna que no sea `Cliente` ni `Comentarios Negrito` se toma como un
+  estilo, con el nombre y el precio tal cual figuran. No hay lista blanca de estilos.
+- Celda vacía = ese cliente no tiene precio para ese estilo.
+- Los nombres de cliente se comparan ignorando mayúsculas y espacios, así `Burden` y `burden`
+  no generan dos listas separadas.
+- Solo se leen las **hojas visibles**. Las hojas ocultas (meses viejos) se ignoran.
+
+---
+
 ## ¿Dónde se guardan los datos?
 
 Los datos (productos, listas, historial) se guardan en el **localStorage del browser**.

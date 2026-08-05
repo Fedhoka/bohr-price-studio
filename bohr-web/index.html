@@ -287,6 +287,48 @@
     </div>
 </div>
 
+<!-- ── MODAL: Elegir hojas del Excel ── -->
+<div class="modal-overlay hidden" id="modalSheetPicker">
+    <div class="modal-box wide">
+        <div class="modal-head">
+            <h3>Importar Excel</h3>
+            <button class="modal-close" onclick="closeAllModals()">&times;</button>
+        </div>
+        <div style="font-size:0.82rem;color:var(--text-2);margin-bottom:16px;">
+            Estas son las hojas con datos de clientes. Confirmá cuál corresponde a cada línea.
+        </div>
+        <div id="sheetPickerInfo"></div>
+        <div class="field-row">
+            <div class="field">
+                <label>Hoja de Barriles</label>
+                <select id="fSheetBarriles" class="select-input"></select>
+            </div>
+            <div class="field">
+                <label>Hoja de Latas</label>
+                <select id="fSheetLatas" class="select-input"></select>
+            </div>
+        </div>
+        <div class="modal-actions">
+            <button class="btn btn-ghost" onclick="closeAllModals()">Cancelar</button>
+            <button class="btn btn-primary" onclick="confirmSheetImport()">Importar</button>
+        </div>
+    </div>
+</div>
+
+<!-- ── MODAL: Resultado de la importación ── -->
+<div class="modal-overlay hidden" id="modalImportReport">
+    <div class="modal-box wide">
+        <div class="modal-head">
+            <h3>Resultado de la importación</h3>
+            <button class="modal-close" onclick="closeAllModals()">&times;</button>
+        </div>
+        <div id="importReportBody"></div>
+        <div class="modal-actions">
+            <button class="btn btn-primary" onclick="closeAllModals()">Listo</button>
+        </div>
+    </div>
+</div>
+
 <!-- ── MODAL: Historial ── -->
 <div class="modal-overlay hidden" id="modalHistory">
     <div class="modal-box wide">

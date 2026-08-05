@@ -575,6 +575,45 @@ tbody tr:hover td { background: rgba(255,255,255,0.02); }
 }
 .history-modal-meta { font-size: 0.75rem; color: var(--text-3); margin-top: 3px; }
 
+/* ── IMPORT DE EXCEL (elección de hojas + reporte) ── */
+.select-input {
+    width: 100%;
+    padding: 10px 14px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-lit);
+    border-radius: var(--radius-sm);
+    color: var(--text-1);
+    font-family: var(--font-ui);
+    font-size: 0.9rem;
+    cursor: pointer;
+}
+.select-input:focus { outline: none; border-color: var(--amber); }
+
+.sheet-info {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 12px 14px;
+    margin-bottom: 10px;
+}
+.sheet-info-name   { font-size: 0.88rem; font-weight: 600; }
+.sheet-info-meta   { font-size: 0.75rem; color: var(--amber); margin-top: 4px; }
+.sheet-info-styles { font-size: 0.72rem; color: var(--text-3); margin-top: 6px; line-height: 1.5; }
+
+#importReportBody { max-height: 420px; overflow-y: auto; }
+.report-block {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 12px 14px;
+    margin-bottom: 10px;
+}
+.report-block.warn { border-color: rgba(245,166,35,0.3); }
+.report-title { font-size: 0.8rem; font-weight: 600; margin-bottom: 6px; }
+.report-block.warn .report-title { color: var(--amber); }
+.report-items { font-size: 0.75rem; color: var(--text-2); line-height: 1.6; }
+.report-warn  { font-size: 0.75rem; color: var(--text-2); line-height: 1.6; }
+
 /* ── EXPORT CANVAS (hidden, for html2canvas) ── */
 .export-wrap {
     position: fixed;
@@ -594,6 +633,15 @@ tbody tr:hover td { background: rgba(255,255,255,0.02); }
     color: #1a1a1a;
     box-sizing: border-box;
     overflow: hidden;
+
+    /* Densidad del JPG — fitExportCanvas() las baja si hay muchos estilos */
+    --ec-logo-w:      720px;
+    --ec-logo-mt:     100px;
+    --ec-box-pad:     60px 70px;
+    --ec-row-pad:     26px;
+    --ec-name-size:   2.9rem;
+    --ec-val-size:    3.1rem;
+    --ec-extras-size: 1.5rem;
 }
 
 .ec-bg-img {
@@ -609,11 +657,11 @@ tbody tr:hover td { background: rgba(255,255,255,0.02); }
 }
 
 .ec-logo-img {
-    width: 720px;
+    width: var(--ec-logo-w);
     filter: none;
     position: relative;
     z-index: 3;
-    margin-top: 100px;
+    margin-top: var(--ec-logo-mt);
 }
 
 .ec-logo-area {
@@ -654,7 +702,7 @@ tbody tr:hover td { background: rgba(255,255,255,0.02); }
     width: 90%;
     background: rgba(255,255,255,0.96);
     border-radius: 32px;
-    padding: 60px 70px;
+    padding: var(--ec-box-pad);
     box-shadow: 0 30px 80px rgba(0,0,0,0.35), 0 0 0 1px rgba(255,255,255,0.5);
 }
 
@@ -662,7 +710,7 @@ tbody tr:hover td { background: rgba(255,255,255,0.02); }
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 26px 0;
+    padding: var(--ec-row-pad) 0;
     border-bottom: 2px dotted #e0e0e0;
 }
 .ec-price-row:last-child { border-bottom: none; }
@@ -670,7 +718,7 @@ tbody tr:hover td { background: rgba(255,255,255,0.02); }
 .ec-price-name {
     font-family: var(--font-export);
     font-weight: normal;
-    font-size: 2.9rem;
+    font-size: var(--ec-name-size);
     color: #1a1a1a;
     letter-spacing: 2px;
     text-transform: uppercase;
@@ -678,7 +726,7 @@ tbody tr:hover td { background: rgba(255,255,255,0.02); }
 
 .ec-price-extras {
     font-family: var(--font-export);
-    font-size: 1.5rem;
+    font-size: var(--ec-extras-size);
     color: #888;
     margin-left: 14px;
     letter-spacing: 1px;
@@ -688,7 +736,7 @@ tbody tr:hover td { background: rgba(255,255,255,0.02); }
     font-family: var(--font-export);
     font-weight: normal;
     color: #d63a4a;
-    font-size: 3.1rem;
+    font-size: var(--ec-val-size);
     letter-spacing: 2px;
     white-space: nowrap;
 }
